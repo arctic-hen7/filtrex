@@ -1,0 +1,42 @@
+main = {
+    SOI ~ (NEWLINE* ~ predicate)* ~ EOI
+}
+
+predicate = { term ~ ":" ~ expr }
+
+/// This mess avoids left-recursion and Pratt parsers.
+expr     = { or_expr }
+or_expr  = { negator? ~ and_expr ~ (or_joiner ~ and_expr)* }
+and_expr = { negator? ~ primary ~ (and_joiner ~ primary)* }
+primary  = { "(" ~ or_expr ~ ")" | comparator }
+
+comparator                       = _{ comparator_with_inline_predicate | comparator_simple }
+comparator_simple                =  { obj ~ operator ~ comparator_rhs }
+comparator_with_inline_predicate =  { obj ~ ".(" ~ predicate ~ ")" }
+
+obj               =  { (term_with_index ~ ".")* ~ term_with_index }
+term_with_index   =  { term ~ array_index? }
+array_index       = _{ "[" ~ array_index_inner ~ "]" }
+array_index_inner =  { ASCII_DIGIT+ | "ALL" | "ANY" }
+
+comparator_rhs = { string | number | term }
+
+literal = _{ number | string }
+number  = { ASCII_DIGIT ~ (ASCII_DIGIT | "_" | "," | ".")* }
+// (Copied from https://pest.rs/book/examples/json.html.)
+string = ${ "\"" ~ inner ~ "\"" }
+inner  = @{ char* }
+char   =  {
+    !("\"" | "\\") ~ ANY
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+  | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+term = @{ (ASCII_ALPHA | ASCII_DIGIT | "_")+ }
+
+operator   = { "~" | "==" | "!=" | ">=" | ">" | "<=" | "<" }
+or_joiner  = { "OR" | "||" }
+and_joiner = { "AND" | "&&" }
+negator    = { "NOT" | "!" }
+
+WHITESPACE = _{ " " }
